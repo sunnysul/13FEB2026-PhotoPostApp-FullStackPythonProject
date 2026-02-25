@@ -1,0 +1,62 @@
+version: "3.9"
+
+networks:
+  photopostapp-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+
+services:
+  database:
+    build:
+      context: ./database
+      dockerfile: dockerfile
+    container_name: photopostapp-database
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-photopostapp}
+      MYSQL_USER: ${MYSQL_USER:-photopostuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-photopostpassword}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - photopostapp-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend-flask:
+    build:
+      context: ./backend/photopostapp
+      dockerfile: Dockerfile
+    container_name: photopostapp-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URI: mysql+pymysql://${MYSQL_USER:-photopostuser}:${MYSQL_PASSWORD:-photopostpassword}@database:3306/${MYSQL_DATABASE:-photopostapp}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+    ports:
+      - "5000:5000"
+    networks:
+      - photopostapp-network
+    depends_on:
+      database:
+        condition: service_healthy
+
+  frontend-angular:
+    build:
+      context: ./frontend/photopostapp
+      dockerfile: Dockerfile
+    container_name: photopostapp-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - photopostapp-network
+    depends_on:
+      - backend-flask
