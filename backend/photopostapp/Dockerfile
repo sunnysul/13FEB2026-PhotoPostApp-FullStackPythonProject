@@ -6,7 +6,7 @@ RUN pip install uv
 
 COPY pyproject.toml uv.lock ./
 RUN uv pip install --system -r pyproject.toml && \
-    uv pip install --system pymysql
+    uv pip install --system pymysql cryptography
 
 COPY . .
 
